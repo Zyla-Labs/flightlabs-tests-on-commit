@@ -9,10 +9,13 @@
 #   VERCEL_PROJECT_NAME — nombre del proyecto en Vercel (default: flightlabs-api-tests)
 #   SLACK_WEBHOOK_URL   — notificación con link al reporte
 #
-# En el repo fuente (ej. goflightlabs), agregar un workflow que dispare:
-#   repository: <ORG>/Flightlabs-tests-on-commit
+# En el repo fuente (ej. goflightlabs), workflow "Trigger Remote Cypress Tests":
 #   event-type: deploy_trigger
+#   repository: ${{ secrets.CYPRESS_TESTS_OWNER }}/${{ secrets.CYPRESS_TESTS_REPO }}
 # Ver: examples/trigger-from-source-repo.yml
+#
+# Secrets repo FUENTE:
+#   CROSS_REPO_DISPATCH_TOKEN, CYPRESS_TESTS_OWNER, CYPRESS_TESTS_REPO
 
 name: Flightlabs API — Cypress report
 

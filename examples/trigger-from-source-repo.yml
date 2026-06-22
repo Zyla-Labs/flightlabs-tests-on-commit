@@ -1,20 +1,21 @@
-# Copiar este archivo al repositorio fuente (ej. goflightlabs) como:
-#   .github/workflows/trigger-flightlabs-cypress.yml
+# Copiar al repositorio fuente (ej. goflightlabs) como:
+#   .github/workflows/trigger-remote-cypress.yml
 #
 # Secrets en el repo FUENTE:
-#   CROSS_REPO_DISPATCH_TOKEN — PAT con permiso de repository_dispatch en el repo de tests
+#   CROSS_REPO_DISPATCH_TOKEN — PAT con permiso repository_dispatch en el repo de tests
+#   CYPRESS_TESTS_OWNER       — org o usuario dueño del repo de tests (ej. Zylalabs)
+#   CYPRESS_TESTS_REPO        — nombre del repo de tests (ej. Flightlabs-tests-on-commit)
 #
 # Secrets en el repo de TESTS (Flightlabs-tests-on-commit):
 #   FLIGHTLABS_API_KEY
 #   VERCEL_TOKEN
 
-name: Trigger Flightlabs Cypress Tests
+name: Trigger Remote Cypress Tests
 
 on:
   push:
     branches:
       - master
-      - main
   workflow_dispatch:
 
 jobs:
@@ -24,11 +25,25 @@ jobs:
       contents: read
 
     steps:
-      - name: Dispatch event to Cypress tests repository
+      - name: Validate dispatch configuration
+        env:
+          CROSS_REPO_DISPATCH_TOKEN: ${{ secrets.CROSS_REPO_DISPATCH_TOKEN }}
+          CYPRESS_TESTS_OWNER: ${{ secrets.CYPRESS_TESTS_OWNER }}
+          CYPRESS_TESTS_REPO: ${{ secrets.CYPRESS_TESTS_REPO }}
+        run: |
+          if [ -z "$CROSS_REPO_DISPATCH_TOKEN" ] || [ -z "$CYPRESS_TESTS_OWNER" ] || [ -z "$CYPRESS_TESTS_REPO" ]; then
+            echo "Missing one or more required secrets:"
+            echo "- CROSS_REPO_DISPATCH_TOKEN"
+            echo "- CYPRESS_TESTS_OWNER"
+            echo "- CYPRESS_TESTS_REPO"
+            exit 1
+          fi
+
+      - name: Dispatch event to Cypress repository
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.CROSS_REPO_DISPATCH_TOKEN }}
-          repository: YOUR_ORG/Flightlabs-tests-on-commit
+          repository: ${{ secrets.CYPRESS_TESTS_OWNER }}/${{ secrets.CYPRESS_TESTS_REPO }}
           event-type: deploy_trigger
           client-payload: |
             {
