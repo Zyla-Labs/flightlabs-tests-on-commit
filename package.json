@@ -1,0 +1,21 @@
+{
+  "name": "flightlabs-tests-on-commit",
+  "version": "1.0.0",
+  "description": "Cypress API tests for Flightlabs endpoint combinations.",
+  "scripts": {
+    "test": "npm run cypress:run",
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run --browser chrome",
+    "test:report": "cypress run --browser chrome --reporter mochawesome --reporter-options reportDir=cypress/results,overwrite=false,html=true,json=true --spec \"cypress/e2e/**/*.cy.js\"",
+    "report:merge": "mochawesome-merge cypress/results/mochawesome*.json -o cypress/results/mochawesome-final.json",
+    "report:html": "marge cypress/results/mochawesome-final.json -f index -o vercel-dist --inline",
+    "report:publish": "npm run report:merge && npm run report:html"
+  },
+  "devDependencies": {
+    "cypress": "^13.7.0",
+    "dotenv": "^16.6.1",
+    "mochawesome": "^7.1.3",
+    "mochawesome-merge": "^4.3.0",
+    "mochawesome-report-generator": "^6.2.0"
+  }
+}

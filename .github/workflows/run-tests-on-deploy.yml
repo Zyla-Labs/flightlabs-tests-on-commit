@@ -1,0 +1,151 @@
+# Ejecuta Cypress cuando otro repositorio dispara este workflow (repository_dispatch)
+# y publica el reporte HTML (Mochawesome) en Vercel.
+#
+# Secrets en ESTE repo (Settings → Secrets and variables → Actions):
+#   FLIGHTLABS_API_KEY  — API key de Flightlabs
+#   VERCEL_TOKEN        — Token de Vercel para deploy del reporte
+#
+# Opcional:
+#   VERCEL_PROJECT_NAME — nombre del proyecto en Vercel (default: flightlabs-api-tests)
+#   SLACK_WEBHOOK_URL   — notificación con link al reporte
+#
+# En el repo fuente (ej. goflightlabs), agregar un workflow que dispare:
+#   repository: <ORG>/Flightlabs-tests-on-commit
+#   event-type: deploy_trigger
+# Ver: examples/trigger-from-source-repo.yml
+
+name: Flightlabs API — Cypress report
+
+on:
+  repository_dispatch:
+    types: [deploy_trigger, deploy]
+  workflow_dispatch:
+    inputs:
+      note:
+        description: Nota opcional (solo informativa)
+        required: false
+        default: ''
+
+concurrency:
+  group: flightlabs-cypress-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  cypress-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Clean previous results
+        run: rm -rf cypress/results vercel-dist && mkdir -p cypress/results vercel-dist
+
+      - name: Run Cypress tests (Mochawesome)
+        id: cypress
+        continue-on-error: true
+        env:
+          FLIGHTLABS_API_KEY: ${{ secrets.FLIGHTLABS_API_KEY }}
+        run: npm run test:report
+
+      - name: Merge Mochawesome reports
+        if: always()
+        run: |
+          if ls cypress/results/mochawesome*.json 1> /dev/null 2>&1; then
+            npm run report:merge
+          else
+            echo '{"stats":{"tests":0,"passes":0,"failures":0,"pending":0,"skipped":0},"results":[]}' > cypress/results/mochawesome-final.json
+          fi
+
+      - name: Generate HTML report
+        if: always()
+        env:
+          SOURCE_REPO: ${{ github.event.client_payload.source_repository || 'manual' }}
+          SOURCE_BRANCH: ${{ github.event.client_payload.source_branch || github.ref_name }}
+          SOURCE_SHA: ${{ github.event.client_payload.source_sha || github.sha }}
+          SOURCE_ACTOR: ${{ github.event.client_payload.source_actor || github.actor }}
+          SOURCE_RUN_URL: ${{ github.event.client_payload.source_run_url || format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}
+        run: |
+          if [ -s cypress/results/mochawesome-final.json ]; then
+            npm run report:html
+          else
+            cat > vercel-dist/index.html <<EOF
+          <!DOCTYPE html>
+          <html lang="en">
+            <head><meta charset="utf-8"><title>Flightlabs API Tests</title></head>
+            <body>
+              <h1>No test results found</h1>
+              <p>Source: ${SOURCE_REPO} @ ${SOURCE_BRANCH}</p>
+              <p>SHA: ${SOURCE_SHA}</p>
+              <p>Triggered by: ${SOURCE_ACTOR}</p>
+              <p><a href="${SOURCE_RUN_URL}">GitHub Actions run</a></p>
+            </body>
+          </html>
+          EOF
+          fi
+
+          cp vercel.json vercel-dist/vercel.json
+
+          cat > vercel-dist/meta.json <<EOF
+          {
+            "source_repository": "${SOURCE_REPO}",
+            "source_branch": "${SOURCE_BRANCH}",
+            "source_sha": "${SOURCE_SHA}",
+            "source_actor": "${SOURCE_ACTOR}",
+            "source_run_url": "${SOURCE_RUN_URL}",
+            "workflow_run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+            "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+
+      - name: Deploy report to Vercel
+        if: always()
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_NAME: ${{ secrets.VERCEL_PROJECT_NAME || 'flightlabs-api-tests' }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::VERCEL_TOKEN secret is not set."
+            exit 1
+          fi
+
+          npx vercel deploy \
+            --prod \
+            --token="$VERCEL_TOKEN" \
+            --cwd=vercel-dist \
+            --yes \
+            --name "$VERCEL_PROJECT_NAME"
+
+      - name: Notify Slack (optional)
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          VERCEL_PROJECT_NAME: ${{ secrets.VERCEL_PROJECT_NAME || 'flightlabs-api-tests' }}
+          CYPRESS_OUTCOME: ${{ steps.cypress.outcome }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "SLACK_WEBHOOK_URL not set, skipping."
+            exit 0
+          fi
+
+          REPORT_URL="https://${VERCEL_PROJECT_NAME}.vercel.app/index.html"
+          curl -sS -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\"Flightlabs Cypress finished (${CYPRESS_OUTCOME}). Report: ${REPORT_URL}\"}" \
+            "$SLACK_WEBHOOK_URL"
+
+      - name: Fail workflow if Cypress failed
+        if: steps.cypress.outcome == 'failure'
+        run: exit 1

@@ -1,0 +1,40 @@
+# Copiar este archivo al repositorio fuente (ej. goflightlabs) como:
+#   .github/workflows/trigger-flightlabs-cypress.yml
+#
+# Secrets en el repo FUENTE:
+#   CROSS_REPO_DISPATCH_TOKEN — PAT con permiso de repository_dispatch en el repo de tests
+#
+# Secrets en el repo de TESTS (Flightlabs-tests-on-commit):
+#   FLIGHTLABS_API_KEY
+#   VERCEL_TOKEN
+
+name: Trigger Flightlabs Cypress Tests
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+jobs:
+  trigger-remote-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Dispatch event to Cypress tests repository
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.CROSS_REPO_DISPATCH_TOKEN }}
+          repository: YOUR_ORG/Flightlabs-tests-on-commit
+          event-type: deploy_trigger
+          client-payload: |
+            {
+              "source_repository": "${{ github.repository }}",
+              "source_branch": "${{ github.ref_name }}",
+              "source_sha": "${{ github.sha }}",
+              "source_actor": "${{ github.actor }}",
+              "source_run_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
