@@ -10,6 +10,7 @@
 # Nota: conectar Vercel al repo en el dashboard NO crea VERCEL_TOKEN en GitHub.
 #       Esa integración despliega pushes al repo; este workflow sube vercel-dist generado en CI.
 #
+#   VERCEL_REPORT_URL    — (opcional) URL fija del reporte si el CLI no la detecta
 #   SLACK_WEBHOOK_URL    — (opcional) Incoming Webhook de Slack para enviar URL del reporte
 #
 # En el repo fuente (ej. goflightlabs), workflow "Trigger Remote Cypress Tests":
@@ -102,7 +103,7 @@ jobs:
           EOF
           fi
 
-          cp vercel.json vercel-dist/vercel.json
+          cp config/vercel-static.json vercel-dist/vercel.json
 
           cat > vercel-dist/meta.json <<EOF
           {
@@ -117,6 +118,7 @@ jobs:
           EOF
 
       - name: Deploy report to Vercel
+        id: deploy
         if: always()
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -138,6 +140,12 @@ jobs:
             exit 1
           fi
 
+          if [ ! -f vercel-dist/index.html ]; then
+            echo "::error::vercel-dist/index.html no existe. No hay reporte para publicar."
+            ls -la vercel-dist || true
+            exit 1
+          fi
+
           DEPLOY_ARGS=(--prod --token="$VERCEL_TOKEN" --cwd=vercel-dist --yes)
 
           if [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ]; then
@@ -149,7 +157,28 @@ jobs:
             DEPLOY_ARGS+=(--name flightlabs-api-tests)
           fi
 
-          npx vercel deploy "${DEPLOY_ARGS[@]}"
+          set +e
+          OUTPUT=$(npx vercel deploy "${DEPLOY_ARGS[@]}" 2>&1)
+          DEPLOY_EXIT=$?
+          set -e
+          echo "$OUTPUT"
+
+          if [ "$DEPLOY_EXIT" -ne 0 ]; then
+            exit "$DEPLOY_EXIT"
+          fi
+
+          DEPLOY_URL=$(echo "$OUTPUT" | grep -Eo 'https://[a-zA-Z0-9._-]+\.vercel\.app' | tail -n1)
+          if [ -z "$DEPLOY_URL" ]; then
+            DEPLOY_URL="${{ secrets.VERCEL_REPORT_URL }}"
+          fi
+          if [ -z "$DEPLOY_URL" ]; then
+            DEPLOY_URL="https://flightlabs-api-tests.vercel.app"
+          fi
+
+          REPORT_URL="${DEPLOY_URL%/}/"
+          echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+          echo "report_url=$REPORT_URL" >> "$GITHUB_OUTPUT"
+          echo "Report URL: $REPORT_URL"
 
       - name: Notify Slack (optional)
         if: always()
@@ -158,13 +187,20 @@ jobs:
           CYPRESS_OUTCOME: ${{ steps.cypress.outcome }}
           SOURCE_REPO: ${{ github.event.client_payload.source_repository || github.repository }}
           SOURCE_BRANCH: ${{ github.event.client_payload.source_branch || github.ref_name }}
+          REPORT_URL: ${{ steps.deploy.outputs.report_url }}
         run: |
           if [ -z "$SLACK_WEBHOOK_URL" ]; then
             echo "SLACK_WEBHOOK_URL not set, skipping Slack notification."
             exit 0
           fi
 
-          REPORT_URL="https://flightlabs-api-tests.vercel.app/index.html"
+          if [ -z "$REPORT_URL" ]; then
+            REPORT_URL="${{ secrets.VERCEL_REPORT_URL }}"
+          fi
+          if [ -z "$REPORT_URL" ]; then
+            REPORT_URL="https://flightlabs-api-tests.vercel.app/"
+          fi
+
           curl -sS -X POST -H 'Content-type: application/json' \
             --data "{\"text\":\"Flightlabs Cypress finished (${CYPRESS_OUTCOME}).\\nSource: ${SOURCE_REPO} @ ${SOURCE_BRANCH}\\nReport: ${REPORT_URL}\"}" \
             "$SLACK_WEBHOOK_URL"
