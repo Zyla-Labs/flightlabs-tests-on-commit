@@ -2,15 +2,17 @@
 # y publica el reporte HTML (Mochawesome) en Vercel.
 #
 # Secrets en ESTE repo (Settings → Secrets and variables → Actions):
-#   FLIGHTLABS_API_KEY  — API key de Flightlabs
-#   VERCEL_TOKEN        — Token de Vercel para deploy del reporte
+#   FLIGHTLABS_API_KEY   — API key de Flightlabs
+#   VERCEL_TOKEN         — https://vercel.com/account/tokens (obligatorio para deploy desde CI)
+#   VERCEL_ORG_ID        — Vercel → Team Settings → General (recomendado)
+#   VERCEL_PROJECT_ID    — Vercel → Project → Settings → General (recomendado)
 #
-# Opcional:
-#   VERCEL_PROJECT_NAME — nombre del proyecto en Vercel (default: flightlabs-api-tests)
-#   SLACK_WEBHOOK_URL   — notificación con link al reporte
+# Nota: conectar Vercel al repo en el dashboard NO crea VERCEL_TOKEN en GitHub.
+#       Esa integración despliega pushes al repo; este workflow sube vercel-dist generado en CI.
+#
+#   SLACK_WEBHOOK_URL    — (opcional) Incoming Webhook de Slack para enviar URL del reporte
 #
 # En el repo fuente (ej. goflightlabs), workflow "Trigger Remote Cypress Tests":
-#   event-type: deploy_trigger
 #   repository: ${{ secrets.CYPRESS_TESTS_OWNER }}/${{ secrets.CYPRESS_TESTS_REPO }}
 # Ver: examples/trigger-from-source-repo.yml
 #
@@ -118,35 +120,53 @@ jobs:
         if: always()
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_PROJECT_NAME: ${{ secrets.VERCEL_PROJECT_NAME || 'flightlabs-api-tests' }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           if [ -z "$VERCEL_TOKEN" ]; then
-            echo "::error::VERCEL_TOKEN secret is not set."
+            echo "::error::VERCEL_TOKEN no está configurado en GitHub Actions."
+            echo ""
+            echo "Conectar Vercel al repositorio en el dashboard NO crea este secret."
+            echo "Pasos:"
+            echo "  1. Vercel → Account Settings → Tokens → Create"
+            echo "  2. GitHub → Settings → Secrets and variables → Actions"
+            echo "  3. New repository secret → Name: VERCEL_TOKEN"
+            echo ""
+            echo "Opcional (proyecto ya conectado en Vercel):"
+            echo "  VERCEL_ORG_ID     → Team Settings → General"
+            echo "  VERCEL_PROJECT_ID → Project Settings → General"
             exit 1
           fi
 
-          npx vercel deploy \
-            --prod \
-            --token="$VERCEL_TOKEN" \
-            --cwd=vercel-dist \
-            --yes \
-            --name "$VERCEL_PROJECT_NAME"
+          DEPLOY_ARGS=(--prod --token="$VERCEL_TOKEN" --cwd=vercel-dist --yes)
+
+          if [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ]; then
+            echo "Deploy al proyecto Vercel vinculado."
+            export VERCEL_ORG_ID
+            export VERCEL_PROJECT_ID
+          else
+            echo "::warning::VERCEL_ORG_ID o VERCEL_PROJECT_ID no configurados. Deploy por nombre: flightlabs-api-tests"
+            DEPLOY_ARGS+=(--name flightlabs-api-tests)
+          fi
+
+          npx vercel deploy "${DEPLOY_ARGS[@]}"
 
       - name: Notify Slack (optional)
         if: always()
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          VERCEL_PROJECT_NAME: ${{ secrets.VERCEL_PROJECT_NAME || 'flightlabs-api-tests' }}
           CYPRESS_OUTCOME: ${{ steps.cypress.outcome }}
+          SOURCE_REPO: ${{ github.event.client_payload.source_repository || github.repository }}
+          SOURCE_BRANCH: ${{ github.event.client_payload.source_branch || github.ref_name }}
         run: |
           if [ -z "$SLACK_WEBHOOK_URL" ]; then
-            echo "SLACK_WEBHOOK_URL not set, skipping."
+            echo "SLACK_WEBHOOK_URL not set, skipping Slack notification."
             exit 0
           fi
 
-          REPORT_URL="https://${VERCEL_PROJECT_NAME}.vercel.app/index.html"
+          REPORT_URL="https://flightlabs-api-tests.vercel.app/index.html"
           curl -sS -X POST -H 'Content-type: application/json' \
-            --data "{\"text\":\"Flightlabs Cypress finished (${CYPRESS_OUTCOME}). Report: ${REPORT_URL}\"}" \
+            --data "{\"text\":\"Flightlabs Cypress finished (${CYPRESS_OUTCOME}).\\nSource: ${SOURCE_REPO} @ ${SOURCE_BRANCH}\\nReport: ${REPORT_URL}\"}" \
             "$SLACK_WEBHOOK_URL"
 
       - name: Fail workflow if Cypress failed
