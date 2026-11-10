@@ -114,8 +114,8 @@ describe('Historical endpoint - validacion de parametros', () => {
       { name: 'code vacio', params: mergeParams({ code: '' }), includeEmpty: true, expectedStatus: 422, expectedMsg: 'code' },
       { name: 'sin type', params: { code: 'LGA', date_from: baseValid.date_from, date_to: baseValid.date_to }, expectedStatus: 422, expectedMsg: 'type' },
       { name: 'type vacio', params: mergeParams({ type: '' }), includeEmpty: true, expectedStatus: 422, expectedMsg: 'type' },
-      { name: 'sin date_from', params: { code: 'LGA', type: 'departure', date_to: baseValid.date_to }, expectedStatus: 422, expectedMsg: 'date from' },
-      { name: 'sin date_to', params: { code: 'LGA', type: 'departure', date_from: baseValid.date_from }, expectedStatus: 422, expectedMsg: 'date to' },
+      { name: 'sin date_from', params: { code: 'LGA', type: 'departure', date_to: baseValid.date_to }, expectedStatus: 422, expectedMsg: 'date_from' },
+      { name: 'sin date_to', params: { code: 'LGA', type: 'departure', date_from: baseValid.date_from }, expectedStatus: 422, expectedMsg: 'date_to' },
       { name: 'sin date ni rango', params: { code: 'LGA', type: 'departure' }, expectedStatus: 422, expectedMsg: 'date' }
     ];
 
@@ -131,9 +131,9 @@ describe('Historical endpoint - validacion de parametros', () => {
 
   describe('param requerido: code', () => {
     const codeCases = [
-      { name: 'code invalido largo', params: mergeParams({ code: 'ZZZZZ' }), issue: 'formato invalido responde No data found' },
-      { name: 'code numerico', params: mergeParams({ code: '123' }), issue: 'formato invalido responde No data found' },
-      { name: 'code 2 chars', params: mergeParams({ code: 'LG' }), issue: 'formato invalido responde No data found' },
+      { name: 'code invalido largo', params: mergeParams({ code: 'ZZZZZ' }), expectedStatus: 400 },
+      { name: 'code numerico', params: mergeParams({ code: '123' }), expectedStatus: 400 },
+      { name: 'code 2 chars', params: mergeParams({ code: 'LG' }), expectedStatus: 400 },
       { name: 'code minusculas', params: mergeParams({ code: 'lga' }), issue: 'case sensitivity ambigua' }
     ];
 
@@ -142,6 +142,10 @@ describe('Historical endpoint - validacion de parametros', () => {
         makeRequest(testCase.params).then((response) => {
           const msg = getMessage(response.body);
           cy.log(`status=${response.status} msg=${msg} | issue=${testCase.issue}`);
+          if (testCase.expectedStatus) {
+            expect(response.status).to.eq(testCase.expectedStatus);
+            return;
+          }
           expect(response.status).to.be.oneOf([200, 404, 422]);
         });
       });
@@ -150,10 +154,10 @@ describe('Historical endpoint - validacion de parametros', () => {
 
   describe('param requerido: type', () => {
     const typeCases = [
-      { name: 'type invalido landed', params: mergeParams({ type: 'landed' }) },
-      { name: 'type invalido inbound', params: mergeParams({ type: 'inbound' }) },
-      { name: 'type mayusculas DEPARTURE', params: mergeParams({ type: 'DEPARTURE' }) },
-      { name: 'type typo departur', params: mergeParams({ type: 'departur' }) },
+      { name: 'type invalido landed', params: mergeParams({ type: 'landed' }), expectedStatus: 422 },
+      { name: 'type invalido inbound', params: mergeParams({ type: 'inbound' }), expectedStatus: 422 },
+      { name: 'type mayusculas DEPARTURE', params: mergeParams({ type: 'DEPARTURE' }), expectedStatus: 422 },
+      { name: 'type typo departur', params: mergeParams({ type: 'departur' }), expectedStatus: 422 },
       { name: 'type valido departure', params: mergeParams({ type: 'departure' }), expectedStatus: 200 },
       { name: 'type valido arrival', params: mergeParams({ type: 'arrival' }), expectedStatus: 200 }
     ];
@@ -268,22 +272,22 @@ describe('Historical endpoint - validacion de parametros', () => {
       {
         name: 'airline_iata invalido largo',
         params: mergeParams({ airline_iata: 'ZZZZZ' }),
-        issue: 'formato invalido responde No data found'
+        expectedStatus: 400
       },
       {
         name: 'airline_iata 1 char',
         params: mergeParams({ airline_iata: 'D' }),
-        issue: 'formato invalido responde No data found'
+        expectedStatus: 400
       },
       {
         name: 'arr_iataCode invalido',
         params: mergeParams({ arr_iataCode: 'ZZZZ' }),
-        issue: 'formato invalido responde No data found'
+        expectedStatus: 400
       },
       {
         name: 'dep_iataCode invalido en arrival',
         params: mergeParams({ type: 'arrival', dep_iataCode: 'ZZZZ' }),
-        issue: 'formato invalido responde No data found'
+        expectedStatus: 400
       },
       {
         name: 'flight_num no numerico',
@@ -331,7 +335,7 @@ describe('Historical endpoint - validacion de parametros', () => {
     coherenceCases.forEach((testCase) => {
       it(testCase.name, () => {
         makeRequest(testCase.params).then((response) => {
-          expect(response.status).to.eq(404);
+          expect(response.status).to.eq(422);
           expect(getMessage(response.body).toLowerCase()).to.include(
             testCase.expectedMsg.toLowerCase()
           );
@@ -344,14 +348,14 @@ describe('Historical endpoint - validacion de parametros', () => {
     it('parametro desconocido (comportamiento actual)', () => {
       makeRequest(mergeParams({ notAParam: 'x1' })).then((response) => {
         cy.log(`notAParam: status=${response.status} dataLen=${response.body?.data?.length}`);
-        expect(response.status).to.eq(200);
+        expect(response.status).to.eq(400);
       });
     });
 
     it('alias incorrecto dateFrom (comportamiento actual)', () => {
       makeRequest(mergeParams({ dateFrom: '2026-06-02T08:00' })).then((response) => {
         cy.log(`dateFrom: status=${response.status} dataLen=${response.body?.data?.length}`);
-        expect(response.status).to.eq(200);
+        expect(response.status).to.eq(400);
       });
     });
   });

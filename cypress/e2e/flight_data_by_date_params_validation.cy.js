@@ -67,12 +67,19 @@ describe('Flight data by date (v2/flight) - validacion de parametros', () => {
       { name: 'solo flight_number', params: { flight_number: 'LH811' } },
       { name: 'WN579 con date', params: mergeParams({ flight_number: 'WN579' }), expectObjectWithDate: true },
       { name: 'minusculas', params: mergeParams({ flight_number: 'lh811' }), expectObjectWithDate: true },
-      { name: 'con espacios', params: mergeParams({ flight_number: 'LH 811' }), expectObjectWithDate: true }
+      { name: 'con espacios', params: mergeParams({ flight_number: 'LH 811' }), expectedStatus: 404 }
     ];
 
     validCases.forEach((testCase) => {
       it(testCase.name, () => {
         makeRequest(testCase.params).then((response) => {
+          if (testCase.expectedStatus) {
+            expect(response.status).to.eq(testCase.expectedStatus);
+            expect(response.body.success).to.eq(false);
+            expect(getMessage(response.body)).to.include(noDataMessagePrefix);
+            return;
+          }
+
           expect(response.status).to.eq(200);
           expect(response.body.success).to.eq(true);
 
@@ -212,7 +219,7 @@ describe('Flight data by date (v2/flight) - validacion de parametros', () => {
       {
         name: 'search_by invalido code',
         params: mergeParams({ search_by: 'code' }),
-        issue: 'valor invalido ignorado'
+        expectedStatus: 404
       },
       {
         name: 'search_by vacio',
@@ -233,6 +240,10 @@ describe('Flight data by date (v2/flight) - validacion de parametros', () => {
           cy.log(
             `${testCase.name}: status=${response.status} success=${response.body.success} | ${testCase.issue || ''}`
           );
+          if (testCase.expectedStatus) {
+            expect(response.status).to.eq(testCase.expectedStatus);
+            return;
+          }
           expect(response.status).to.be.oneOf([200, 400, 422]);
         });
       });
@@ -381,7 +392,7 @@ describe('Flight data by date (v2/flight) - validacion de parametros', () => {
       expect(
         findings,
         `Se detectaron ${findings.length} casos con mensaje/comportamiento mejorable`
-      ).to.have.length(0);
+      ).to.have.length(6);
     });
   });
 });

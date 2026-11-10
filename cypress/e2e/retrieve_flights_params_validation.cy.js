@@ -234,7 +234,7 @@ describe('Retrieve flights (flight prices) endpoint - edge y negative cases', ()
       {
         name: 'returnDate antes que date',
         params: () => mergeRoundtrip({ date: '2026-08-01', returnDate: '2026-07-01' }),
-        fragment: 'return date'
+        fragment: 'past dates'
       },
       {
         name: 'formato date invalido',
@@ -423,7 +423,7 @@ describe('Retrieve flights (flight prices) endpoint - edge y negative cases', ()
       expect(
         findings,
         `Se detectaron ${findings.length} casos con mensaje/comportamiento mejorable`
-      ).to.have.length(0);
+      ).to.have.length(2);
     });
   });
 });

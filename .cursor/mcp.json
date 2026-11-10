@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "goflightlabs": {
+      "url": "https://mcp.goflightlabs.com/mcp",
+      "auth": {
+        "CLIENT_ID": "17"
+      }
+    }
+  }
+}

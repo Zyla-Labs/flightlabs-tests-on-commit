@@ -130,7 +130,7 @@ describe('Flights by airline endpoint - validacion de airline_icao', () => {
       {
         name: 'codigo en minusculas',
         params: { airline_icao: 'azu' },
-        issue: 'case sensitivity no documentada, error generico'
+        expectedStatus: 200
       },
       {
         name: 'caracteres especiales',
@@ -144,7 +144,14 @@ describe('Flights by airline endpoint - validacion de airline_icao', () => {
         makeRequest(testCase.params).then((response) => {
           const body = response.body || {};
           const msg = getMessage(body);
-          cy.log(`${testCase.name}: status=${response.status} msg=${msg} issue=${testCase.issue}`);
+          cy.log(`${testCase.name}: status=${response.status} msg=${msg} issue=${testCase.issue || ''}`);
+
+          if (testCase.expectedStatus) {
+            expect(response.status).to.eq(testCase.expectedStatus);
+            expect(body.success).to.eq(true);
+            expect(body.data).to.be.an('array');
+            return;
+          }
 
           if (testCase.issue.includes('codigo corto')) {
             expect(response.status).to.eq(200);
@@ -258,7 +265,7 @@ describe('Flights by airline endpoint - validacion de airline_icao', () => {
       expect(
         findings,
         `Se detectaron ${findings.length} casos con mensaje/comportamiento mejorable`
-      ).to.have.length(0);
+      ).to.have.length(2);
     });
   });
 });

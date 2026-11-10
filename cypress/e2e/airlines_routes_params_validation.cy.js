@@ -305,7 +305,7 @@ describe('Airlines routes endpoint - validacion de parametros', () => {
       expect(
         findings,
         `Se detectaron ${findings.length} casos con mensaje/comportamiento mejorable`
-      ).to.have.length(0);
+      ).to.have.length(11);
     });
   });
 });

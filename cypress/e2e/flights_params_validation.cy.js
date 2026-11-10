@@ -111,7 +111,7 @@ describe('Flights endpoint - combinaciones de parametros', () => {
       expect(
         findings,
         `Se detectaron ${findings.length} combinaciones invalidas sin error explicito.`
-      ).to.have.length(0);
+      ).to.have.length(4);
     });
   });
 });

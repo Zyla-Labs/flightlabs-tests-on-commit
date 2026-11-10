@@ -120,31 +120,29 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
       });
     });
 
-    it('US puede devolver aerolineas sin airline_logo ni iata_code', () => {
+    it('US incluye airline_logo en todas las aerolineas', () => {
       makeRequest({ codeIso2Country: 'US' }).then((response) => {
         const withoutLogo = response.body.data.filter((airline) => !('airline_logo' in airline));
         cy.log(`US sin airline_logo: ${withoutLogo.length}/${response.body.data.length}`);
-        expect(withoutLogo.length).to.be.greaterThan(0);
+        expect(withoutLogo.length).to.eq(0);
       });
     });
   });
 
   describe('filtros vacios', () => {
-    it('codeIataAirline vacio devuelve lista completa', () => {
+    it('codeIataAirline vacio', () => {
       makeRequest({ codeIataAirline: '' }, { includeEmpty: true }).then((response) => {
-        cy.log(`status=${response.status} dataLen=${response.body?.data?.length}`);
-        expect(response.status).to.eq(200);
-        expect(response.body.data).to.be.an('array');
-        expect(response.body.data.length).to.be.greaterThan(1000);
+        expect(response.status).to.eq(400);
+        expect(response.body.success).to.eq(false);
+        expect(getMessage(response.body)).to.eq('codeIataAirline cannot be empty when provided');
       });
     });
 
-    it('codeIso2Country vacio devuelve lista completa', () => {
+    it('codeIso2Country vacio', () => {
       makeRequest({ codeIso2Country: '' }, { includeEmpty: true }).then((response) => {
-        cy.log(`status=${response.status} dataLen=${response.body?.data?.length}`);
-        expect(response.status).to.eq(200);
-        expect(response.body.data).to.be.an('array');
-        expect(response.body.data.length).to.be.greaterThan(1000);
+        expect(response.status).to.eq(400);
+        expect(response.body.success).to.eq(false);
+        expect(getMessage(response.body)).to.eq('codeIso2Country cannot be empty when provided');
       });
     });
   });
@@ -174,7 +172,9 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
       { name: 'country inexistente XX', params: { codeIso2Country: 'XX' } },
       {
         name: 'filtros conflictivos AA + BR',
-        params: { codeIataAirline: 'AA', codeIso2Country: 'BR' }
+        params: { codeIataAirline: 'AA', codeIso2Country: 'BR' },
+        expectedStatus: 400,
+        expectedMsg: 'No airline matches both codeIataAirline and codeIso2Country'
       }
     ];
 
@@ -184,6 +184,11 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
           cy.log(
             `${testCase.name}: status=${response.status} dataType=${typeof response.body?.data} msg=${getMessage(response.body)}`
           );
+          if (testCase.expectedStatus) {
+            expect(response.status).to.eq(testCase.expectedStatus);
+            expect(getMessage(response.body)).to.eq(testCase.expectedMsg);
+            return;
+          }
           expect(response.status).to.be.oneOf([200, 404]);
         });
       });
@@ -191,20 +196,17 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
   });
 
   describe('ambiguedad iata corto', () => {
-    it('iata 1 char no devuelve match exacto', () => {
+    it('iata 1 char', () => {
       makeRequest({ codeIataAirline: 'A' }).then((response) => {
-        cy.log(
-          `status=${response.status} iata=${response.body?.data?.[0]?.iata_code} name=${response.body?.data?.[0]?.name}`
-        );
-        expect(response.status).to.eq(200);
-        expect(response.body.data).to.be.an('array').and.not.be.empty;
-        expect(response.body.data[0].iata_code).to.not.eq('A');
+        expect(response.status).to.eq(400);
+        expect(response.body.success).to.eq(false);
+        expect(getMessage(response.body)).to.eq('codeIataAirline must be a 2-character IATA code');
       });
     });
   });
 
   describe('country UK vs GB', () => {
-    it('UK y GB devuelven conjuntos distintos', () => {
+    it('UK y GB devuelven la misma cantidad', () => {
       makeRequest({ codeIso2Country: 'UK' }).then((ukResponse) => {
         expect(ukResponse.status).to.eq(200);
         expect(ukResponse.body.data).to.be.an('array').and.not.be.empty;
@@ -213,7 +215,7 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
           expect(gbResponse.status).to.eq(200);
           expect(gbResponse.body.data).to.be.an('array').and.not.be.empty;
           cy.log(`UK=${ukResponse.body.data.length} GB=${gbResponse.body.data.length}`);
-          expect(ukResponse.body.data.length).to.not.eq(gbResponse.body.data.length);
+          expect(ukResponse.body.data.length).to.eq(gbResponse.body.data.length);
         });
       });
     });
@@ -222,27 +224,27 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
   describe('parametros no documentados', () => {
     it('alias incorrecto iata_code', () => {
       makeRequest({ iata_code: 'AA' }).then((response) => {
-        cy.log(`status=${response.status} dataLen=${response.body?.data?.length}`);
-        expect(response.status).to.eq(200);
-        expect(response.body.data).to.be.an('array');
-        expect(response.body.data.length).to.be.greaterThan(1000);
+        expect(response.status).to.eq(400);
+        expect(response.body.success).to.eq(false);
+        expect(getMessage(response.body)).to.eq(
+          'Unknown query parameter: iata_code. Did you mean codeIataAirline?'
+        );
       });
     });
 
     it('alias incorrecto code_iata_airline', () => {
       makeRequest({ code_iata_airline: 'AA' }).then((response) => {
-        cy.log(`status=${response.status} dataLen=${response.body?.data?.length}`);
-        expect(response.status).to.eq(200);
-        expect(response.body.data).to.be.an('array');
-        expect(response.body.data.length).to.be.greaterThan(1000);
+        expect(response.status).to.eq(400);
+        expect(response.body.success).to.eq(false);
+        expect(getMessage(response.body)).to.eq('Unknown query parameter: code_iata_airline');
       });
     });
 
     it('parametro desconocido con filtro valido', () => {
       makeRequest({ codeIataAirline: 'AA', notAParam: 'x1' }).then((response) => {
-        expect(response.status).to.eq(200);
-        expect(response.body.success).to.eq(true);
-        expect(response.body.data).to.be.an('array').and.not.be.empty;
+        expect(response.status).to.eq(400);
+        expect(response.body.success).to.eq(false);
+        expect(getMessage(response.body)).to.eq('Unknown query parameter: notAParam');
       });
     });
   });
