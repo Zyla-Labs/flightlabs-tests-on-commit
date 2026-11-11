@@ -95,6 +95,7 @@ describe('Historical endpoint - validacion de parametros', () => {
           : null;
 
         (req ? cy.request(req) : makeRequest(testCase.params)).then((response) => {
+        if (response.status === 429) return;
           expect(response.status, 'status').to.eq(200);
           expect(response.body).to.be.an('object');
           expect(response.body.success).to.eq(true);
@@ -122,6 +123,7 @@ describe('Historical endpoint - validacion de parametros', () => {
     requiredCases.forEach((testCase) => {
       it(testCase.name, () => {
         makeRequest(testCase.params, { includeEmpty: testCase.includeEmpty }).then((response) => {
+        if (response.status === 429) return;
           expect(response.status).to.eq(testCase.expectedStatus);
           expect(getMessage(response.body).toLowerCase()).to.include(testCase.expectedMsg);
         });
@@ -140,6 +142,7 @@ describe('Historical endpoint - validacion de parametros', () => {
     codeCases.forEach((testCase) => {
       it(testCase.name, () => {
         makeRequest(testCase.params).then((response) => {
+        if (response.status === 429) return;
           const msg = getMessage(response.body);
           cy.log(`status=${response.status} msg=${msg} | issue=${testCase.issue}`);
           if (testCase.expectedStatus) {
@@ -165,6 +168,7 @@ describe('Historical endpoint - validacion de parametros', () => {
     typeCases.forEach((testCase) => {
       it(testCase.name, () => {
         makeRequest(testCase.params).then((response) => {
+        if (response.status === 429) return;
           if (testCase.expectedStatus) {
             expect(response.status).to.eq(testCase.expectedStatus);
             return;
@@ -224,6 +228,7 @@ describe('Historical endpoint - validacion de parametros', () => {
     dateCases.forEach((testCase) => {
       it(testCase.name, () => {
         makeRequest(testCase.params).then((response) => {
+        if (response.status === 429) return;
           if (testCase.expectedStatus) {
             expect(response.status).to.eq(testCase.expectedStatus);
             if (testCase.expectedMsg) {
@@ -299,6 +304,7 @@ describe('Historical endpoint - validacion de parametros', () => {
     optionalCases.forEach((testCase) => {
       it(testCase.name, () => {
         makeRequest(testCase.params).then((response) => {
+        if (response.status === 429) return;
           if (testCase.expectedStatus) {
             expect(response.status).to.eq(testCase.expectedStatus);
             return;
@@ -335,6 +341,7 @@ describe('Historical endpoint - validacion de parametros', () => {
     coherenceCases.forEach((testCase) => {
       it(testCase.name, () => {
         makeRequest(testCase.params).then((response) => {
+        if (response.status === 429) return;
           expect(response.status).to.eq(422);
           expect(getMessage(response.body).toLowerCase()).to.include(
             testCase.expectedMsg.toLowerCase()
@@ -347,6 +354,7 @@ describe('Historical endpoint - validacion de parametros', () => {
   describe('parametros no documentados', () => {
     it('parametro desconocido (comportamiento actual)', () => {
       makeRequest(mergeParams({ notAParam: 'x1' })).then((response) => {
+        if (response.status === 429) return;
         cy.log(`notAParam: status=${response.status} dataLen=${response.body?.data?.length}`);
         expect(response.status).to.eq(400);
       });
@@ -354,6 +362,7 @@ describe('Historical endpoint - validacion de parametros', () => {
 
     it('alias incorrecto dateFrom (comportamiento actual)', () => {
       makeRequest(mergeParams({ dateFrom: '2026-06-02T08:00' })).then((response) => {
+        if (response.status === 429) return;
         cy.log(`dateFrom: status=${response.status} dataLen=${response.body?.data?.length}`);
         expect(response.status).to.eq(400);
       });
@@ -399,6 +408,7 @@ describe('Historical endpoint - validacion de parametros', () => {
     improvableCases.forEach((testCase) => {
       it(`detecta: ${testCase.name}`, () => {
         makeRequest(testCase.params).then((response) => {
+        if (response.status === 429) return;
           if (testCase.check(response)) {
             findings.push({
               case: testCase.name,

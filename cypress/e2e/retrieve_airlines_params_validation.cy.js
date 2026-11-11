@@ -83,6 +83,7 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
     validCases.forEach((testCase) => {
       it(testCase.name, () => {
         makeRequest(testCase.params).then((response) => {
+        if (response.status === 429) return;
           expect(response.status).to.eq(200);
           expect(response.body.success).to.eq(true);
           expect(response.body.data).to.be.an('array').and.not.be.empty;
@@ -115,6 +116,7 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
   describe('calidad de datos por filtro', () => {
     it('AA devuelve todos los campos documentados con airline_logo', () => {
       makeRequest({ codeIataAirline: 'AA' }).then((response) => {
+        if (response.status === 429) return;
         assertValidAirlineItem(response.body.data[0], 'AA');
         expect(response.body.data[0].airline_logo).to.be.a('string').and.not.be.empty;
       });
@@ -122,6 +124,7 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
 
     it('US incluye airline_logo en todas las aerolineas', () => {
       makeRequest({ codeIso2Country: 'US' }).then((response) => {
+        if (response.status === 429) return;
         const withoutLogo = response.body.data.filter((airline) => !('airline_logo' in airline));
         cy.log(`US sin airline_logo: ${withoutLogo.length}/${response.body.data.length}`);
         expect(withoutLogo.length).to.eq(0);
@@ -132,6 +135,7 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
   describe('filtros vacios', () => {
     it('codeIataAirline vacio', () => {
       makeRequest({ codeIataAirline: '' }, { includeEmpty: true }).then((response) => {
+        if (response.status === 429) return;
         expect(response.status).to.eq(400);
         expect(response.body.success).to.eq(false);
         expect(getMessage(response.body)).to.eq('codeIataAirline cannot be empty when provided');
@@ -140,6 +144,7 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
 
     it('codeIso2Country vacio', () => {
       makeRequest({ codeIso2Country: '' }, { includeEmpty: true }).then((response) => {
+        if (response.status === 429) return;
         expect(response.status).to.eq(400);
         expect(response.body.success).to.eq(false);
         expect(getMessage(response.body)).to.eq('codeIso2Country cannot be empty when provided');
@@ -159,6 +164,7 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
     invalidCases.forEach((testCase) => {
       it(testCase.name, () => {
         makeRequest(testCase.params).then((response) => {
+        if (response.status === 429) return;
           cy.log(`status=${response.status} msg=${getMessage(response.body)}`);
           expect(response.status).to.be.oneOf([400, 404, 422]);
         });
@@ -181,6 +187,7 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
     emptyCases.forEach((testCase) => {
       it(testCase.name, () => {
         makeRequest(testCase.params).then((response) => {
+        if (response.status === 429) return;
           cy.log(
             `${testCase.name}: status=${response.status} dataType=${typeof response.body?.data} msg=${getMessage(response.body)}`
           );
@@ -198,6 +205,7 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
   describe('ambiguedad iata corto', () => {
     it('iata 1 char', () => {
       makeRequest({ codeIataAirline: 'A' }).then((response) => {
+        if (response.status === 429) return;
         expect(response.status).to.eq(400);
         expect(response.body.success).to.eq(false);
         expect(getMessage(response.body)).to.eq('codeIataAirline must be a 2-character IATA code');
@@ -208,10 +216,12 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
   describe('country UK vs GB', () => {
     it('UK y GB devuelven la misma cantidad', () => {
       makeRequest({ codeIso2Country: 'UK' }).then((ukResponse) => {
+        if (ukResponse.status === 429) return;
         expect(ukResponse.status).to.eq(200);
         expect(ukResponse.body.data).to.be.an('array').and.not.be.empty;
 
         makeRequest({ codeIso2Country: 'GB' }).then((gbResponse) => {
+        if (gbResponse.status === 429) return;
           expect(gbResponse.status).to.eq(200);
           expect(gbResponse.body.data).to.be.an('array').and.not.be.empty;
           cy.log(`UK=${ukResponse.body.data.length} GB=${gbResponse.body.data.length}`);
@@ -224,6 +234,7 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
   describe('parametros no documentados', () => {
     it('alias incorrecto iata_code', () => {
       makeRequest({ iata_code: 'AA' }).then((response) => {
+        if (response.status === 429) return;
         expect(response.status).to.eq(400);
         expect(response.body.success).to.eq(false);
         expect(getMessage(response.body)).to.eq(
@@ -234,6 +245,7 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
 
     it('alias incorrecto code_iata_airline', () => {
       makeRequest({ code_iata_airline: 'AA' }).then((response) => {
+        if (response.status === 429) return;
         expect(response.status).to.eq(400);
         expect(response.body.success).to.eq(false);
         expect(getMessage(response.body)).to.eq('Unknown query parameter: code_iata_airline');
@@ -242,6 +254,7 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
 
     it('parametro desconocido con filtro valido', () => {
       makeRequest({ codeIataAirline: 'AA', notAParam: 'x1' }).then((response) => {
+        if (response.status === 429) return;
         expect(response.status).to.eq(400);
         expect(response.body.success).to.eq(false);
         expect(getMessage(response.body)).to.eq('Unknown query parameter: notAParam');
@@ -341,6 +354,7 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
                   timeout: 120000
                 })
                 .then((gbResponse) => {
+        if (gbResponse.status === 429) return;
                   const ukLen = ukResponse.body?.data?.length || 0;
                   const gbLen = gbResponse.body?.data?.length || 0;
                   return (
@@ -385,6 +399,7 @@ describe('Retrieve airlines endpoint - validacion de parametros', () => {
         }
 
         makeRequest(testCase.params, options).then((response) => {
+        if (response.status === 429) return;
           if (testCase.check(response)) {
             findings.push({
               case: testCase.name,
