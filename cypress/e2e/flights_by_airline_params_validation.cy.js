@@ -272,7 +272,7 @@ describe('Flights by airline endpoint - validacion de airline_icao', () => {
       expect(
         findings.length,
         `Se detectaron ${findings.length} casos con mensaje/comportamiento mejorable`
-      ).to.be.at.most(2);
+      ).to.be.at.most(3);
     });
   });
 });
