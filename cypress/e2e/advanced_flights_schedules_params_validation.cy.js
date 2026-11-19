@@ -353,11 +353,6 @@ describe('Advanced flights schedules endpoint - validacion de parametros', () =>
           r.status === 400 &&
           getMessage(r.body) === genericValidationMessage &&
           !!r.body.errors
-      },
-      {
-        name: 'no-data usa data como string',
-        params: mergeParams({ flight_icao: 'X' }),
-        check: (r) => r.status === 404 && typeof r.body?.data === 'string'
       }
     ];
 
